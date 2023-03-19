@@ -1,0 +1,356 @@
+var things = [];
+var bullets = [];
+var tornadoes = [];
+var bombs = [];
+var level = 1;
+var keys = [];
+var speed = 5;
+var health = 1000000;
+var maxHealth = health;
+var menu = true;
+var last = 0;
+var time = 0;
+frameRate(60);
+keyPressed = function(){
+    keys[keyCode]=true;
+};
+keyReleased = function(){
+    keys[keyCode]=false;
+};
+var you = new PVector(200,200);
+var bomb = function(){
+    if(level<10){
+        this.pos = new PVector(random(width),0);
+    }
+    else{
+        this.pos=new PVector(you.x,0);
+    }
+    this.vel = new PVector(0,5);
+    this.explode = false;
+    this.time = 5;
+};
+bomb.prototype.display = function(){
+    if(frameCount%2===0||frameCount%3===0||frameCount%4===0){
+        fill(255, 0, 0);
+    }
+    else{
+        fill(200,0,0);
+    }
+    ellipse(this.pos.x,this.pos.y,30,30);
+    if(this.explode){
+        fill(255, 0, 0);
+        ellipse(this.pos.x,this.pos.y,(100-this.time*10),(100-this.time*10));
+        if(dist(this.pos.x,this.pos.y,you.x,you.y)<=100-this.time*10){
+            health-=5;
+        }
+    }
+};
+bomb.prototype.update = function(){
+    this.pos.add(this.vel);
+    if(dist(this.pos.x,this.pos.y,you.x,you.y)<=40||this.pos.y>=height-15){
+        this.explode = true;
+    }
+    if(this.explode){
+        this.time--;
+        this.pos.sub(this.vel);
+    }
+    if(level>=20){
+        var movement = PVector.sub(this.pos,you);
+        movement.normalize();
+        movement.mult(level/20);
+        this.vel.sub(movement);
+        this.vel.y+=0.1;
+    }
+};
+bomb.prototype.dead = function(){
+    if(this.time<=0){
+        return(true);
+    }
+    else{
+        return(false);
+    }
+};
+bomb.prototype.go = function(){
+    this.update();
+    this.display();
+};
+var tornado = function(x,y,vel){
+    this.circles = [];
+    this.pos = new PVector(x,y);
+    this.vel=vel;
+};
+tornado.prototype.display = function(){
+    for(var i = this.circles.length;i>0;i--){
+        stroke(255,255,255);
+        fill(0,0,0);
+        ellipse(this.pos.x,this.pos.y,this.circles[i],this.circles[i]);
+    }
+};
+tornado.prototype.update = function(){
+    this.pos.add(this.vel);
+    for(var i =0;i<this.circles.length;i++){
+        this.circles[i]-=random(5,10);
+        if(this.circles[i]<=0){
+            this.circles.splice(i,1);
+        }
+    }
+    this.circles.push(100);
+};
+tornado.prototype.dead = function(){
+    if(this.pos.x>width||this.pos.x<0||this.pos.y>height||this.pos.y<0){
+        return(true);
+    }
+    else{
+        return(false);
+    }
+};
+tornado.prototype.go = function(){
+    this.update();
+    this.display();
+};
+var bullet = function(x,y,vel){
+    this.pos = new PVector(x,y);
+    this.vel = new PVector(vel.x,vel.y);
+};
+bullet.prototype.display = function(){
+    rectMode(CENTER);
+    fill(0,0,255);
+    translate(this.pos.x,this.pos.y);
+    rotate(atan2(this.vel.y,this.vel.x));
+    resetMatrix();
+    stroke(255, 0, 0);
+    if(level<5){
+        line(this.pos.x,this.pos.y,this.pos.x+this.vel.x*100,this.pos.y+this.vel.y*100);
+    }
+    else{
+        line(this.pos.x,this.pos.y,you.x,you.y);
+    }
+    noStroke();
+    translate(this.pos.x,this.pos.y);
+    rotate(atan2(this.vel.y,this.vel.x));
+    rect(0,0,50,25);
+    resetMatrix();
+
+};
+bullet.prototype.update = function(){
+    this.pos.add(this.vel);
+    if(level>=5){
+        var dest = new PVector(you.x,you.y);
+        var movement = PVector.sub(dest, this.pos);
+        movement.normalize();
+        movement.mult(level/2);
+        this.vel.add(PVector.div(movement, random(10,15)));
+    }
+};
+bullet.prototype.dead = function(){
+    if(this.pos.x>width||this.pos.x<0||this.pos.y>height||this.pos.y<0){
+        return(true);
+    }
+    else{
+        return(false);
+    }
+};
+bullet.prototype.go = function(){
+    this.display();
+    this.update();
+};
+var thing = function(){
+    this.pos = new PVector(200,200);
+    this.size = random(10,15);
+    this.vel = new PVector(random(-5,5),random(-5,5));
+    this.life = 10;
+};
+thing.prototype.display = function(){
+    fill(this.life*25,0,0);
+    ellipse(this.pos.x,this.pos.y,this.size,this.size);
+};
+thing.prototype.update = function(){
+    this.pos.add(this.vel);
+    if(this.pos.x>width||this.pos.x<0){
+        this.vel.x=-this.vel.x;
+        this.life--;
+    }
+    if(this.pos.y>height||this.pos.y<0){
+        this.vel.y=-this.vel.y;
+        this.life--;
+    }
+};
+thing.prototype.dead = function(){
+    if(this.life<=0){
+        return(true);
+    }
+    else{
+        for(var i = 0;i<bullets.length;i++){
+            if(dist(this.pos.x,this.pos.y,bullets[i].pos.x,bullets[i].pos.y)<=this.size/2+35){
+                return(true);
+            }
+        }
+    }
+};
+thing.prototype.go = function(){
+    this.update();
+    this.display();
+};
+var draw= function() {
+    background(0,0,0);
+    level=500;
+    if(!menu){
+        if(frameCount%60===0){
+            time++;
+        }
+        if(frameCount%max(500-level,1)===0){
+            var a = round(random(3));
+            if(a===0){
+                tornadoes.push(new tornado(0,random(height),new PVector(5,random(-5,5))));
+            }
+            if(a===1){
+                tornadoes.push(new tornado(random(width),0,new PVector(random(-5,5),5)));
+            }
+            if(a===2){
+                tornadoes.push(new tornado(width,random(height),new PVector(-5,random(-5,5))));
+            }
+            if(a===3){
+                tornadoes.push( new tornado(random(width),height,new PVector(random(-5,5),-5)));
+            }
+        }
+        for(var i = 0;i<tornadoes.length;i++){
+            tornadoes[i].go();
+            var target = tornadoes[i].pos;
+            var move = PVector.sub(target,you);
+            move.normalize();
+            move.mult(5);
+            you.add(move);
+            if(dist(you.x,you.y,tornadoes[i].pos.x,tornadoes[i].pos.y)<=25){
+                health--;
+            }
+            if(tornadoes[i].dead()){
+                tornadoes.splice(i,1);
+            }
+    
+        }
+        if(frameCount%500===0){
+            level++;
+        }
+        if(frameCount%max(100-level,1)===0){
+            var a = round(random(3));
+            if(a===0){
+                bullets.push(new bullet(0,random(height),new PVector(5,random(-5,5))));
+            }
+            if(a===1){
+                bullets.push(new bullet(random(width),0,new PVector(random(-5,5),5)));
+            }
+            if(a===2){
+                bullets.push(new bullet(width,random(height),new PVector(-5,random(-5,5))));
+            }
+            if(a===3){
+                bullets.push( new bullet(random(width),height,new PVector(random(-5,5),-5)));
+            }
+        }
+        if(frameCount%max(50-level,1)===0){
+            bombs.push(new bomb());
+        }
+        if(frameCount%5===0){
+            things.push(new thing());
+        }
+        for(var i = 0;i<things.length;i++){
+            things[i].go();
+            if(things[i].dead()){
+                things.splice(i,1);
+            }
+        }
+        if(you){
+            if(you.x>width){
+                you.x=width;
+            }
+            if(you.x<0){
+                you.x=0;
+            }
+            if(you.y>height){
+                you.y=height;
+            }
+            if(you.y<0){
+                you.y=0;
+            }
+            fill(255, 255, 255);
+            ellipse(you.x,you.y,50,50);
+            fill(255,0,0);
+            rectMode(RIGHT);
+            rect(you.x-50,you.y-50,100,10);
+            fill(0,255,0);
+            rect(you.x-50,you.y-50,health/(maxHealth/100),10);
+            fill(255,255,255);
+            textAlign(CENTER,CENTER);
+            textSize(15);
+            text(health+" hp ("+ round((health/maxHealth)*100)+"%)",you.x-50,you.y-150,100,100);
+            if(health<=0){
+                menu=true;
+                last = frameCount;
+            }
+        }
+        for(var i = 0;i<bullets.length;i++){
+            bullets[i].go();
+            if(dist(you.x,you.y,bullets[i].pos.x,bullets[i].pos.y)<=40){
+                health--;
+            }
+            if(bullets[i].dead()){
+                bullets.splice(i,1);
+            }
+        }
+        for(var i =0;i<bombs.length;i++){
+            bombs[i].go();
+            if(bombs[i].dead()){
+                bombs.splice(i,1);
+            }
+        }
+        if(keys[UP]){
+            you.y-=speed;
+        }
+        if(keys[DOWN]){
+            you.y+=speed;
+        }
+        if(keys[RIGHT]){
+            you.x+=speed;
+        }
+        if(keys[LEFT]){
+            you.x-=speed;
+        }
+        fill(255,255,255);
+        textAlign(CENTER,CENTER);
+        textSize(50);
+        text(level,200,100);
+    }
+    else{
+        textSize(40);
+        translate(200,100);
+        if(frameCount<last+50){
+            rotate(frameCount*10-last);
+        }
+        textAlign(CENTER,CENTER);
+        fill(255, 0, 0);
+        text("SPACE SURVIVAL",0,0);
+        resetMatrix();
+        fill(255, 0, 0);
+        text("time:"+time+" seconds",200,275);
+        fill(255, 0, 0,frameCount*10-last);
+        rectMode(RIGHT);
+        rect(150,300,100,50,frameCount-last);
+        fill(255,255,255,frameCount*5-last);
+        text("play",200,325);
+        imageMode(CENTER);
+        for(var i = 100;i<400;i+=100){
+            translate(i,sin(frameCount*5)*5+200);
+            rotate(0);
+            image(getImage("cute/Star"),0,0);
+            resetMatrix();
+        }
+        if(mouseIsPressed&&dist(mouseX,mouseY,200,325)<=50){
+            menu = false;
+            time=0;
+            things = [];
+            tornadoes = [];
+            bullets = [];
+            level=0;
+            health=maxHealth;
+        }
+    }
+};
